@@ -12,7 +12,11 @@ Questions are embedded with [`Qwen/Qwen3-Embedding-4B`](https://huggingface.co/Q
 
 This project uses [uv](https://github.com/astral-sh/uv) for dependency management.
 
+Installing uv is easy and painless:
+
 ```bash
+# Download and install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 # Install dependencies
 uv sync
 ```
@@ -68,9 +72,10 @@ But the basic sequence of events are:
 ssh <your e0111.. login>@xlogin.comp.nus.edu.sg
 ```
 
-Once on the cluster, clone the repo and install dependencies:
+Once on the cluster, download uv, clone the repo and install dependencies:
 
 ```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/reallyjustalan/Quora-Question-Pairs.git
 cd Quora-Question-Pairs
 uv sync
