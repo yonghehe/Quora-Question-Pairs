@@ -3,6 +3,8 @@ import kagglehub
 import numpy as np
 import zarr
 from sentence_transformers import SentenceTransformer
+import os
+import csv 
 
 # Config
 MODEL_NAME = "Qwen/Qwen3-Embedding-4B"
@@ -25,8 +27,6 @@ def format_duration(seconds: float) -> str:
 print("[INFO] Loading dataset...", flush=True)
 path = kagglehub.dataset_download("quora/question-pairs-dataset")
 print("Path to dataset files:", path)
-
-import os, csv
 
 # Find the CSV file in the downloaded path
 csv_file = os.path.join(path, "questions.csv")
