@@ -7,7 +7,7 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gpus=1
 
-cd ~/final_project
+cd ~/Quora-Question-Pairs
 
 # uv creates and manages the venv automatically
 uv run python embed_quora.py
