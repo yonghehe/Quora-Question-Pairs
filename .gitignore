@@ -1,5 +1,7 @@
 data/
 .env
+# experiment outputs (generated — do not commit)
+experiments/results/
 *.pem
 __pycache__/
 logs/

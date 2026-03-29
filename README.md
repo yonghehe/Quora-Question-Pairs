@@ -72,7 +72,8 @@ Look up a question by ID with `np.searchsorted(store["ids"], qid)`.
 | Script | What it does |
 |--------|-------------|
 | `embed_quora.py` | Downloads the Quora dataset via `kagglehub`, embeds every unique question with Qwen3-Embedding-4B (SDPA, batches of 128), and writes the result to `embeddings.zarr`. Logs progress every 30 s. |
-| `catboost_thresh.py` | Loads `embeddings.zarr`, builds a 22-feature pairwise feature matrix (embedding distances + lexical features), then compares a cosine baseline and a **Logistic Regression** against a **CatBoost** classifier (500 iterations, depth 8). Prints feature importances and optionally saves misclassified test pairs to `catboost_test_errors.csv`. |
+| `catboost_thresh.py` | *(Legacy)* Monolithic script: loads embeddings, builds features, trains cosine baseline + Logistic Regression + CatBoost, evaluates, and saves errors. Kept as a reference. Use `experiments/` for new work. |
+| `experiments/run_experiment.py` | **New entry point.** Plug-and-play experiment runner — see the [Experiment Harness](#experiment-harness) section below. |
 
 ---
 
@@ -155,17 +156,94 @@ sbatch --job-name=embed_quora --output=logs/embed_quora_%j.log --error=logs/embe
 
 ---
 
+## Experiment Harness
+
+All new model experiments live in `experiments/`. The key idea is that **model logic, feature building, and the evaluation pipeline are completely separate files** — you snap them together.
+
+### How it works
+
+```
+embeddings.zarr  ──►  data.py  ──►  model.build_features()  ──►  run_experiment.py  ──►  report.py
+                      (loads)        (each model picks its          (fixed pipeline:        (metrics.txt
+                                      own feature set from           split → fit →           errors.csv
+                                      features.py primitives)        predict)                all_experiments.csv)
+```
+
+- **`data.py`** — loads the zarr store + CSV into a list of `PairRecord` objects. No model logic here.
+- **`features.py`** — pure feature functions (`embedding_features`, `lexical_features`, `all_features`). Each returns a `dict[str, float]` per pair. Models import whatever they need.
+- **`models/<name>.py`** — each model owns its feature selection and any internal pre-processing (e.g. `StandardScaler` in `logreg_model.py`). Every model exposes three methods: `build_features()`, `fit()`, and `predict_proba()`.
+- **`run_experiment.py`** — the fixed pipeline entry point. Change 3 lines to swap models.
+- **`report.py`** — takes predictions and writes the full report (see below).
+
+### Fixed split — fair comparison
+
+The first run saves `experiments/splits/default_split.npz`. Every subsequent run loads those exact train/test indices. All models are therefore evaluated on **identical test rows**, making comparisons meaningful.
+
+### Running an experiment
+
+```bash
+cd experiments
+uv run run_experiment.py
+```
+
+To switch to a different model, edit the three lines in the `EXPERIMENT CONFIG` block at the top of `run_experiment.py`:
+
+```python
+from models.logreg_model import LogRegModel   # ← swap
+MODEL = LogRegModel()                          # ← swap
+EXPERIMENT_NAME = "logreg_all_features"        # ← unique name
+```
+
+For quick smoke-tests, set `MAX_ROWS = 50_000` in the same file.
+
+### Report output
+
+Each run produces:
+
+```
+experiments/results/
+├── all_experiments.csv               ← one row per run (accuracy, precision, recall, F1, TP/FP/TN/FN)
+└── <experiment_name>/
+    ├── metrics.txt                   ← full metrics block + classification report
+    ├── errors.csv                    ← every FP and FN with question text and predicted probability
+    └── feature_importance.txt        ← ranked feature importances (if the model supports it)
+```
+
+### Adding a new model
+
+1. Create `experiments/models/my_model.py` — copy any existing model as a template.
+2. Implement `build_features(records)`, `fit(X_train, y_train)`, and `predict_proba(X_test)`.
+3. Optionally implement `feature_importances() → dict[str, float]` for automatic importance reporting.
+4. Import and instantiate it in `run_experiment.py`.
+
+### Adding a new feature set
+
+Add a function to `features.py` that takes a `PairRecord` and returns `dict[str, float]`, then reference it from your model's `_feature_fn`.
+
+---
+
 ## Project Structure
 
 ```
 .
-├── embed_quora.py          # Embedding pipeline
-├── catboost_thresh.py      # CatBoost classifier (+ logistic regression baseline)
-├── embeddings.zarr.dvc     # DVC pointer to the Zarr store
-├── slurm_gpu.sh            # Slurm job script for GPU tasks (e.g. embedding)
-├── slurm_cpu.sh            # Slurm job script for CPU-only tasks (e.g. classifiers)
-├── submit.sh               # Convenience wrapper: auto-names logs and routes to logs/
-├── logs/                   # Created automatically; contains <script>_<jobid>.log/.err
+├── embed_quora.py              # Step 1: embed all questions → embeddings.zarr
+├── catboost_thresh.py          # (Legacy) monolithic classifier script
+├── experiments/
+│   ├── run_experiment.py       # Step 2: entry point for all model experiments
+│   ├── data.py                 # Shared loader: zarr + CSV → list[PairRecord]
+│   ├── features.py             # Primitive feature functions (embedding, lexical)
+│   ├── report.py               # Metrics printer + results writer
+│   ├── models/
+│   │   ├── catboost_model.py
+│   │   ├── logreg_model.py
+│   │   └── cosine_baseline.py
+│   ├── splits/                 # Auto-created; holds the fixed train/test split
+│   └── results/                # Auto-created; one subfolder per experiment run
+├── embeddings.zarr.dvc         # DVC pointer to the Zarr store
+├── slurm_gpu.sh                # Slurm job script for GPU tasks (e.g. embedding)
+├── slurm_cpu.sh                # Slurm job script for CPU-only tasks (e.g. classifiers)
+├── submit.sh                   # Convenience wrapper: auto-names logs and routes to logs/
+├── logs/                       # Created automatically; contains <script>_<jobid>.log/.err
 ├── pyproject.toml
 └── uv.lock
 ```
