@@ -1,0 +1,11 @@
+name: qwen_embedding
+channels:
+  - conda-forge
+dependencies:
+  - sentence-transformers
+  - jupyterlab
+  - pandas
+  - matplotlib
+  - seaborn
+  - nltk
+prefix: /home/e/e0958668/miniforge3/envs/qwen_embedding
