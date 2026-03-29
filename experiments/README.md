@@ -14,7 +14,8 @@ experiments/
 ├── models/
 │   ├── catboost_model.py
 │   ├── logreg_model.py
-│   └── cosine_baseline.py
+│   ├── cosine_baseline.py
+│   └── xgboost_model.py
 │
 ├── splits/
 │   └── default_split.npz   (auto-created on first run, reused forever)
@@ -45,9 +46,15 @@ Open `run_experiment.py` and change the three lines in the
 `EXPERIMENT CONFIG` block:
 
 ```python
-from models.catboost_model import CatBoostModel   # ← model import
-MODEL = CatBoostModel()                            # ← model instance
-EXPERIMENT_NAME = "catboost_all_features"          # ← unique folder name
+from models.xgboost_model import XGBoostModel      # ← model import
+MODEL = XGBoostModel()                             # ← model instance
+EXPERIMENT_NAME = "xgboost_matryoshka_all_features"  # ← unique folder name
+```
+
+For matryoshka-aware experiments, pass explicit prefix dims if desired:
+
+```python
+MODEL = XGBoostModel(matryoshka_dims=(128, 256, 512, 1024, 2560))
 ```
 
 ## Adding a new model
@@ -65,6 +72,13 @@ EXPERIMENT_NAME = "catboost_all_features"          # ← unique folder name
 
 Add a function to `features.py` that takes a `PairRecord` and returns
 `dict[str, float]`.  Reference it from your model's `_feature_fn`.
+
+This repo also includes:
+- `matryoshka_embedding_features(...)`
+- `matryoshka_all_features(...)`
+
+which compute embedding statistics over prefix slices (e.g. 128→2560)
+for models that want multi-scale matryoshka signals.
 
 ## Results comparison
 

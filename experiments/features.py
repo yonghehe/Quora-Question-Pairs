@@ -15,6 +15,9 @@ import numpy as np
 from data import PairRecord
 
 
+DEFAULT_MATRYOSHKA_DIMS = (128, 256, 512, 1024, 1536, 2048, 2560)
+
+
 # ---------------------------------------------------------------------------
 # Tokenisation helper (shared)
 # ---------------------------------------------------------------------------
@@ -64,6 +67,77 @@ def embedding_features(r: PairRecord) -> dict[str, float]:
     }
 
 
+def _resolve_matryoshka_dims(
+    emb_dim: int,
+    dims: tuple[int, ...] | None,
+) -> list[int]:
+    """Sanitise requested prefix dimensions against the real embedding size."""
+    if dims is None:
+        dims = DEFAULT_MATRYOSHKA_DIMS
+
+    resolved: list[int] = []
+    seen: set[int] = set()
+
+    for d in dims:
+        d = int(d)
+        if d <= 0:
+            continue
+        d = min(d, emb_dim)
+        if d not in seen:
+            resolved.append(d)
+            seen.add(d)
+
+    # Always include the full vector as the final slice.
+    if emb_dim not in seen:
+        resolved.append(emb_dim)
+
+    return resolved
+
+
+def matryoshka_embedding_features(
+    r: PairRecord,
+    dims: tuple[int, ...] | None = None,
+) -> dict[str, float]:
+    """
+    Embedding features computed over matryoshka prefix slices.
+
+    For each prefix dimension d, this returns:
+      d{d}_cos_sim, d{d}_dot_raw, d{d}_euclidean, d{d}_manhattan,
+      d{d}_abs_diff_mean, d{d}_abs_diff_max, d{d}_abs_diff_std,
+      d{d}_prod_mean, d{d}_prod_std
+    """
+    u_raw, v_raw = r.emb1, r.emb2
+    emb_dim = min(len(u_raw), len(v_raw))
+    slice_dims = _resolve_matryoshka_dims(emb_dim, dims)
+
+    feats: dict[str, float] = {}
+
+    for d in slice_dims:
+        u_d = u_raw[:d]
+        v_d = v_raw[:d]
+
+        abs_diff = np.abs(u_d - v_d)
+        prod = u_d * v_d
+
+        u_norm = float(np.linalg.norm(u_d))
+        v_norm = float(np.linalg.norm(v_d))
+        cos_den = max(u_norm * v_norm, 1e-12)
+        cos_sim = float(np.dot(u_d, v_d) / cos_den)
+
+        p = f"d{d}_"
+        feats[f"{p}cos_sim"] = cos_sim
+        feats[f"{p}dot_raw"] = float(np.dot(u_d, v_d))
+        feats[f"{p}euclidean"] = float(np.linalg.norm(u_d - v_d))
+        feats[f"{p}manhattan"] = float(abs_diff.sum())
+        feats[f"{p}abs_diff_mean"] = float(abs_diff.mean())
+        feats[f"{p}abs_diff_max"] = float(abs_diff.max())
+        feats[f"{p}abs_diff_std"] = float(abs_diff.std())
+        feats[f"{p}prod_mean"] = float(prod.mean())
+        feats[f"{p}prod_std"] = float(prod.std())
+
+    return feats
+
+
 # ---------------------------------------------------------------------------
 # Lexical / surface-form primitives
 # ---------------------------------------------------------------------------
@@ -109,6 +183,17 @@ def lexical_features(r: PairRecord) -> dict[str, float]:
 def all_features(r: PairRecord) -> dict[str, float]:
     """Return every available feature for a pair (embedding + lexical)."""
     return {**embedding_features(r), **lexical_features(r)}
+
+
+def matryoshka_all_features(
+    r: PairRecord,
+    dims: tuple[int, ...] | None = None,
+) -> dict[str, float]:
+    """Return matryoshka-sliced embedding features + lexical features."""
+    return {
+        **matryoshka_embedding_features(r, dims=dims),
+        **lexical_features(r),
+    }
 
 
 # ---------------------------------------------------------------------------

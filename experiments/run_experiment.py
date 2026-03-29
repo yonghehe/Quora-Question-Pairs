@@ -37,12 +37,12 @@ from data import load_pairs
 from report import generate_report
 
 # ---------------------------------------------------------------------------
-# === EXPERIMENT CONFIG — change these two lines per experiment ===
+# === EXPERIMENT CONFIG — change these lines per experiment ===
 # ---------------------------------------------------------------------------
 
-from models.catboost_model import CatBoostModel  # ← swap model import
-MODEL = CatBoostModel()                           # ← instantiate model
-EXPERIMENT_NAME = "catboost_all_features"         # ← unique name for this run
+from models.xgboost_model import XGBoostModel  # ← swap model import
+MODEL = XGBoostModel()                         # ← instantiate model
+EXPERIMENT_NAME = "xgboost_matryoshka_all_features"  # ← unique name for this run
 
 # ---------------------------------------------------------------------------
 # Pipeline config — usually leave these alone
