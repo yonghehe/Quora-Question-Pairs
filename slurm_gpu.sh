@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=ml_gpu
-#SBATCH --output=gpu_%j.log
-#SBATCH --error=gpu_%j.err
+#SBATCH --output=logs/%x_%j.log
+#SBATCH --error=logs/%x_%j.err
 #SBATCH --time=02:00:00
 #SBATCH --partition=gpu
 #SBATCH --mem=64G

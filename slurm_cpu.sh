@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=ml_cpu
-#SBATCH --output=cpu_%j.log
-#SBATCH --error=cpu_%j.err
+#SBATCH --output=logs/%x_%j.log
+#SBATCH --error=logs/%x_%j.err
 #SBATCH --time=02:00:00
 #SBATCH --partition=cpu
 #SBATCH --mem=64G

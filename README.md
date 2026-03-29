@@ -118,27 +118,39 @@ Pull the embeddings with DVC (place the provided config files first - you may co
 uv run dvc pull
 ```
 
-There are two Slurm scripts — one for GPU jobs and one for CPU-only jobs. Both take a Python script as their first positional argument, plus any additional arguments to forward to it:
+There are two Slurm scripts (GPU and CPU-only) and a convenience wrapper `submit.sh` that handles log naming and folder organisation for you. **Use `submit.sh` — it is the recommended way to submit jobs.**
 
-**GPU job** (H200 GPU, 64 GB RAM, 8 CPUs, 2 h wall time) — use for embedding:
+### Using `submit.sh` (recommended)
+
+`submit.sh` automatically:
+- derives the job name from the script filename (e.g. `embed_quora` from `embed_quora.py`)
+- routes stdout/stderr to `logs/<script>_<jobid>.log` / `logs/<script>_<jobid>.err`
+- creates the `logs/` directory if it doesn't exist
 
 ```bash
-sbatch slurm_gpu.sh embed_quora.py
-# Output: gpu_<jobid>.log / gpu_<jobid>.err
+# GPU job (H200 GPU, 64 GB RAM, 8 CPUs, 2 h wall time)
+./submit.sh gpu embed_quora.py
+
+# CPU-only job (64 GB RAM, 16 CPUs, 2 h wall time)
+./submit.sh cpu catboost_thresh.py
+
+# Extra arguments are forwarded to the script
+./submit.sh gpu embed_quora.py --batch-size 64
+./submit.sh cpu catboost_thresh.py --threshold 0.5
 ```
 
-**CPU-only job** (64 GB RAM, 16 CPUs, 2 h wall time) — use for classifiers:
-
-```bash
-sbatch slurm_cpu.sh catboost_thresh.py
-# Output: cpu_<jobid>.log / cpu_<jobid>.err
+Log files will appear under `logs/` and be named after the script, e.g.:
+```
+logs/embed_quora_12345.log
+logs/embed_quora_12345.err
 ```
 
-You can pass extra arguments to the script like so:
+### Calling sbatch directly (advanced)
+
+If you prefer to call `sbatch` manually, `%x` in the output path resolves to the job name, so you'll want to set `--job-name` yourself:
 
 ```bash
-sbatch slurm_gpu.sh embed_quora.py --batch-size 64
-sbatch slurm_cpu.sh catboost_thresh.py --threshold 0.5
+sbatch --job-name=embed_quora --output=logs/embed_quora_%j.log --error=logs/embed_quora_%j.err slurm_gpu.sh embed_quora.py
 ```
 
 ---
@@ -152,6 +164,8 @@ sbatch slurm_cpu.sh catboost_thresh.py --threshold 0.5
 ├── embeddings.zarr.dvc     # DVC pointer to the Zarr store
 ├── slurm_gpu.sh            # Slurm job script for GPU tasks (e.g. embedding)
 ├── slurm_cpu.sh            # Slurm job script for CPU-only tasks (e.g. classifiers)
+├── submit.sh               # Convenience wrapper: auto-names logs and routes to logs/
+├── logs/                   # Created automatically; contains <script>_<jobid>.log/.err
 ├── pyproject.toml
 └── uv.lock
 ```

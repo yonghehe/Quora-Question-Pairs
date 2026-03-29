@@ -2,6 +2,7 @@ data/
 .env
 *.pem
 __pycache__/
+logs/
 *.log
 *.err
 embeddings.zarr
