@@ -108,8 +108,8 @@ Once on the cluster, download uv, clone the repo and install dependencies:
 curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/reallyjustalan/Quora-Question-Pairs.git
 cd Quora-Question-Pairs
-uv sync
 ```
+Notice how we didn't even have to bother installing dependencies? uv will do that automatically at runtime!
 
 Pull the embeddings with DVC (place the provided config files first - you may copy files over using `cp`):
 
