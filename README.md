@@ -72,7 +72,6 @@ Look up a question by ID with `np.searchsorted(store["ids"], qid)`.
 | Script | What it does |
 |--------|-------------|
 | `embed_quora.py` | Downloads the Quora dataset via `kagglehub`, embeds every unique question with Qwen3-Embedding-4B (SDPA, batches of 128), and writes the result to `embeddings.zarr`. Logs progress every 30 s. |
-| `catboost_thresh.py` | *(Legacy)* Monolithic script: loads embeddings, builds features, trains cosine baseline + Logistic Regression + CatBoost, evaluates, and saves errors. Kept as a reference. Use `experiments/` for new work. |
 | `experiments/run_experiment.py` | **New entry point.** Plug-and-play experiment runner — see the [Experiment Harness](#experiment-harness) section below. |
 
 ---
