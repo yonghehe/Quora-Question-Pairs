@@ -196,6 +196,36 @@ For quick smoke-tests, add `--max-rows 50000`. Other useful flags: `--threshold`
 
 `--dvc-push` is opt-in so collaborators without DVC write credentials can still run experiments normally.
 
+### Publishing cluster-generated results
+
+If you run experiments on the cluster and want your laptop to be the only machine
+with DVC/Git write credentials, use `publish_results.sh` from your local checkout.
+It pulls `experiments/results/` over SSH with `rsync`, then runs `dvc add`,
+`dvc push`, and `git push` locally.
+
+```bash
+# store these locally in .env (already gitignored)
+cat > .env <<'EOF'
+CLUSTER_HOST=e1234567@xcna1.comp.nus.edu.sg
+CLUSTER_REPO=/home/e1234567/final_project
+EOF
+
+# then publish from your laptop
+./publish_results.sh "Publish cluster catboost run"
+
+# or override for a one-off invocation
+./publish_results.sh \
+  --host e1234567@xcna1.comp.nus.edu.sg \
+  --repo /home/e1234567/final_project \
+  "Publish cluster catboost run"
+```
+
+By default the sync step uses `rsync --delete`, so your local
+`experiments/results/` becomes an exact mirror of the cluster copy. This is
+useful because old experiment folders that were removed or overwritten on the
+cluster do not linger locally and get re-published by accident. If you want to
+keep local-only files, pass `--keep-local-extra`.
+
 ### Report output
 
 Each run produces:
