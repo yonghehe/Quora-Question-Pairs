@@ -33,10 +33,10 @@ _DEFAULTS = dict(
     verbose=100,
 )
 
-param_space = {'iterations': {'type': 'int', 'low': 300, 'high': 1200},
-               'depth': {'type': 'int', 'low': 4, 'high': 10},
-               'learning_rate': {'type': 'float', 'low': 0.01, 'high': 0.3, 'log': True},
-               'l2_leaf_reg': {'type': 'float', 'low': 1.0, 'high': 20.0, 'log': True}
+param_space = {'iterations': {'type': 'int', 'low': 100, 'high': 1000}, #number of boosting rounds
+               'depth': {'type': 'int', 'low': 4, 'high': 10}, #maximum depth of trees -- large trees are more expressive but may overfit
+               'learning_rate': {'type': 'float', 'low': 0.01, 'high': 0.3, 'log': True}, #step size - affects speed of convergence to minima
+               'l2_leaf_reg': {'type': 'float', 'low': 1.0, 'high': 20.0, 'log': True} #strength of Ridge Regularisation
                }
 
 class CatBoostModel:
