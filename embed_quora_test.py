@@ -1,9 +1,9 @@
 """
 embed_quora_test.py — Embed all unique questions from the Kaggle test set.
 
-Downloads the Quora Question Pairs *competition* test data (test.csv),
-extracts every unique question text, embeds them with Qwen3-Embedding-4B,
-and writes the result to test_embeddings.zarr.
+Downloads the Quora Question Pairs dataset (quora/question-pairs-dataset),
+locates test.csv, extracts every unique question text, embeds them with
+Qwen3-Embedding-4B, and writes the result to test_embeddings.zarr.
 
 The output zarr store is keyed by sorted question text (alphabetical order):
     store["texts"]       shape (N,)         dtype: str      — unique question texts
@@ -11,12 +11,7 @@ The output zarr store is keyed by sorted question text (alphabetical order):
 
 At query time, build a dict from store["texts"] → position for O(1) lookup.
 
-Requires Kaggle authentication.  The easiest way is to place your API token
-at ~/.kaggle/kaggle.json:
-    {"username": "your_username", "key": "your_api_key"}
-Or set environment variables:
-    export KAGGLE_USERNAME=your_username
-    export KAGGLE_KEY=your_api_key
+No Kaggle authentication is required — the dataset is publicly available.
 
 Usage:
     uv run embed_quora_test.py
@@ -31,9 +26,6 @@ import csv
 import os
 import time
 
-from dotenv import load_dotenv
-load_dotenv()  # loads KAGGLE_USERNAME and KAGGLE_KEY from .env
-
 import kagglehub
 import numpy as np
 import zarr
@@ -46,7 +38,7 @@ from sentence_transformers import SentenceTransformer
 MODEL_NAME    = "Qwen/Qwen3-Embedding-4B"
 DEFAULT_OUT   = "test_embeddings.zarr"
 BATCH_SIZE    = 128
-COMP_HANDLE   = "quora-question-pairs"
+DATASET_HANDLE = "quora/question-pairs-dataset"
 
 
 # ---------------------------------------------------------------------------
@@ -105,12 +97,12 @@ def main() -> None:
     args = parser.parse_args()
 
     # ------------------------------------------------------------------
-    # 1. Download competition test data
+    # 1. Download dataset (contains both questions.csv and test.csv)
     # ------------------------------------------------------------------
-    print("[INFO] Downloading competition data (quora-question-pairs)...", flush=True)
-    comp_path = kagglehub.competition_download(COMP_HANDLE)
-    print(f"[INFO] Competition path : {comp_path}", flush=True)
-    print(f"[INFO] Files            : {sorted(os.listdir(comp_path))}", flush=True)
+    print(f"[INFO] Downloading dataset ({DATASET_HANDLE})...", flush=True)
+    comp_path = kagglehub.dataset_download(DATASET_HANDLE)
+    print(f"[INFO] Dataset path : {comp_path}", flush=True)
+    print(f"[INFO] Files        : {sorted(os.listdir(comp_path))}", flush=True)
 
     test_csv = _find_test_csv(comp_path)
     print(f"[INFO] Using test CSV   : {test_csv}", flush=True)

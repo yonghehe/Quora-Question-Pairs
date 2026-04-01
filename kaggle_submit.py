@@ -33,8 +33,8 @@ Prerequisites
 -------------
 1. embeddings.zarr        — training question embeddings (from embed_quora.py)
 2. test_embeddings.zarr   — test question embeddings   (from embed_quora_test.py)
-3. Kaggle credentials     — needed only to download the test.csv metadata:
-     ~/.kaggle/kaggle.json  OR  env vars KAGGLE_USERNAME + KAGGLE_KEY
+3. test.csv metadata      — downloaded from the public Kaggle dataset
+     (quora/question-pairs-dataset); no authentication required.
 
 Usage
 -----
@@ -73,7 +73,7 @@ from datetime import datetime
 from typing import NamedTuple
 
 from dotenv import load_dotenv
-load_dotenv()  # loads KAGGLE_USERNAME and KAGGLE_KEY from .env
+load_dotenv()  # loads environment variables from .env
 
 import numpy as np
 import zarr
@@ -173,7 +173,7 @@ class TestPair(NamedTuple):
 
 def load_test_pairs(
     test_zarr_file: str = "test_embeddings.zarr",
-    competition_handle: str = "quora-question-pairs",
+    dataset_handle: str = "quora/question-pairs-dataset",
 ) -> list[TestPair]:
     """
     Build one TestPair per row of the competition test.csv.
@@ -184,8 +184,8 @@ def load_test_pairs(
 
     Parameters
     ----------
-    test_zarr_file      : path to the zarr store written by embed_quora_test.py
-    competition_handle  : kagglehub handle for 'quora-question-pairs'
+    test_zarr_file  : path to the zarr store written by embed_quora_test.py
+    dataset_handle  : kagglehub dataset handle (public, no auth required)
 
     Returns
     -------
@@ -209,8 +209,8 @@ def load_test_pairs(
     norm_emb  = emb_np / np.clip(raw_norms[:, None], 1e-12, None)   # (N_unique, dim)
 
     # --- download test.csv ------------------------------------------------ #
-    print(f"[test_data] Downloading competition data: {competition_handle}", flush=True)
-    comp_path = kagglehub.competition_download(competition_handle)
+    print(f"[test_data] Downloading dataset: {dataset_handle}", flush=True)
+    comp_path = kagglehub.dataset_download(dataset_handle)
     test_csv  = _find_test_csv(comp_path)
     print(f"[test_data] Using test CSV : {test_csv}", flush=True)
 
