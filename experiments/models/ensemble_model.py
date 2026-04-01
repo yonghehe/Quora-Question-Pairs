@@ -10,24 +10,25 @@ Design constraints
 ------------------
 Each base model owns its own feature space (XGBoost uses matryoshka stats,
 GRU v3 uses raw embeddings, etc.), so a shared feature matrix is impossible.
-Instead, EnsembleModel:
+Instead, EnsembleModel uses a *stub matrix* trick:
 
   1. build_features()  — calls every member's build_features() and stores the
                          full per-member X arrays internally.  Returns a thin
-                         (N, n_members) stub so run_experiment.py can slice
-                         train/test rows as usual without any code changes.
+                         (N, n_members) stub where column 0 holds the original
+                         row index (0, 1, 2, …, N-1).
 
-  2. fit()             — uses the stub's row-count to recover the train portion
-                         of each member's stored X, then fits each member on
-                         its own feature space.  For stacking a meta-learner is
-                         also trained on OOF predictions.
+  2. fit()             — run_experiment.py slices X_train_stub = stub[train_idx],
+                         so X_train_stub[:, 0] == train_idx exactly.  fit()
+                         reads those indices and uses them to select the correct
+                         rows from each member's stored full-dataset X.
 
-  3. predict_proba()   — recovers each member's test rows (everything after
-                         n_train in the stored full arrays), collects their
-                         probability vectors, and combines them.
+  3. predict_proba()   — X_test_stub[:, 0] == test_idx.  predict_proba() reads
+                         those indices to select the correct test rows for each
+                         member.
 
-This means run_experiment.py, report.py, and the split logic all remain
-entirely unchanged.
+No contiguous-block assumption is made; the shuffle/stratify from
+run_experiment.py is fully respected.  run_experiment.py, report.py, and the
+split logic all remain entirely unchanged.
 
 Adding to run_experiment.py
 ---------------------------
@@ -106,9 +107,10 @@ class EnsembleModel:
         self.meta_folds = meta_folds
         self.threshold  = threshold
 
-        # Full per-member feature arrays (set in build_features, sliced in fit/predict)
+        # Full per-member feature arrays (set in build_features, indexed in fit/predict
+        # via the row indices carried in column 0 of the stub matrix)
         self._member_X_all: list[np.ndarray] = []
-        self._n_train: int = 0   # set during fit(); used by predict_proba()
+        self._train_idx: np.ndarray = np.empty(0, dtype=np.intp)
 
         # Stacking components
         self._meta_scaler = StandardScaler()
@@ -156,7 +158,14 @@ class EnsembleModel:
 
         y = ys[0]
         n = len(records)
-        stub = np.zeros((n, len(self.members)), dtype=np.float32)
+
+        # The stub carries the original row index in column 0.
+        # run_experiment.py will slice this with train_idx / test_idx, so
+        # X_train_stub[:, 0] == train_idx  and  X_test_stub[:, 0] == test_idx.
+        # fit() and predict_proba() use these to index _member_X_all correctly,
+        # bypassing the broken assumption that rows are laid out contiguously.
+        stub = np.zeros((n, max(len(self.members), 1)), dtype=np.float32)
+        stub[:, 0] = np.arange(n, dtype=np.float32)
         return stub, y, self._feature_names
 
     # ------------------------------------------------------------------ #
@@ -167,11 +176,13 @@ class EnsembleModel:
         """
         Fit every base model on its own feature matrix.
 
-        The stub's row count tells us how many rows belong to the training
-        split, so we can recover each member's X_train from _member_X_all.
+        Column 0 of the stub holds the original row indices (set in
+        build_features).  We use those to slice each member's stored full-
+        dataset X correctly, regardless of how run_experiment.py shuffled
+        or stratified the split.
         """
-        self._n_train = len(X_train_stub)
-        member_X_trains = [X_m[: self._n_train] for X_m in self._member_X_all]
+        self._train_idx = X_train_stub[:, 0].astype(np.intp)
+        member_X_trains = [X_m[self._train_idx] for X_m in self._member_X_all]
 
         if self.strategy == "stacking":
             self._fit_stacking(member_X_trains, y_train)
@@ -248,9 +259,14 @@ class EnsembleModel:
         """
         Recover each member's test rows from the stored full arrays, collect
         probability vectors, then combine via the chosen strategy.
+
+        Column 0 of X_test_stub holds the original row indices (placed there
+        by build_features and preserved by run_experiment.py's numpy slice).
+        We use those to index _member_X_all directly — no contiguous-block
+        assumption needed.
         """
-        # Member test rows are everything after n_train in the stored full arrays
-        member_X_tests = [X_m[self._n_train :] for X_m in self._member_X_all]
+        test_idx = X_test_stub[:, 0].astype(np.intp)
+        member_X_tests = [X_m[test_idx] for X_m in self._member_X_all]
 
         probas = np.stack(
             [
