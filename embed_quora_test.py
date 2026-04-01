@@ -17,6 +17,7 @@ Usage:
     uv run embed_quora_test.py
     uv run embed_quora_test.py --batch-size 64
     uv run embed_quora_test.py --output my_test_embeddings.zarr
+    uv run embed_quora_test.py --local-test-csv /path/to/test.csv
 """
 
 from __future__ import annotations
@@ -57,28 +58,46 @@ def _fmt(seconds: float) -> str:
 
 
 def _find_test_csv(competition_path: str) -> str:
-    """Return path to the test CSV inside the competition download."""
-    # Preferred name
+    """Return path to the test CSV inside the competition download.
+
+    Explicitly ignores ``test.csv.zip`` (and any other .zip files), which
+    kagglehub may place alongside the real CSV but which cannot be read as
+    plain text.
+    """
+    # Preferred name — must be a plain file, never a zip archive
     preferred = os.path.join(competition_path, "test.csv")
-    if os.path.exists(preferred):
+    if os.path.exists(preferred) and not preferred.endswith(".zip"):
         return preferred
 
-    # Fall back: first CSV with the right headers
+    # Warn if we see the zip — it is not the file we want
+    zip_path = os.path.join(competition_path, "test.csv.zip")
+    if os.path.exists(zip_path):
+        print(
+            f"[WARN] Found {zip_path!r} — this is a zip archive and will be "
+            "ignored.  Looking for a plain test.csv instead.",
+            flush=True,
+        )
+
+    # Fall back: first plain CSV (not a zip) with the right headers
     required = {"test_id", "question1", "question2"}
     for fname in sorted(os.listdir(competition_path)):
-        if not fname.endswith(".csv"):
+        # Skip anything that is not a plain .csv file
+        if not fname.endswith(".csv") or fname.endswith(".csv.zip"):
             continue
         full = os.path.join(competition_path, fname)
         try:
             with open(full, newline="", encoding="utf-8") as f:
                 headers = set(csv.DictReader(f).fieldnames or [])
             if required.issubset(headers):
+                print(f"[INFO] Found matching CSV via header scan: {full}", flush=True)
                 return full
         except Exception:
             pass
 
     raise FileNotFoundError(
-        f"No CSV with headers {sorted(required)} found in {competition_path}"
+        f"No plain CSV with headers {sorted(required)} found in {competition_path!r}.\n"
+        "Tip: copy your local test.csv into that directory, or pass "
+        "--local-test-csv /path/to/test.csv to skip the download entirely."
     )
 
 
@@ -94,18 +113,41 @@ def main() -> None:
     parser.add_argument("--output",     default=DEFAULT_OUT,   help="Output zarr store path.")
     parser.add_argument("--batch-size", default=BATCH_SIZE, type=int, help="Encoding batch size.")
     parser.add_argument("--model",      default=MODEL_NAME,    help="SentenceTransformer model name.")
+    parser.add_argument(
+        "--local-test-csv",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Path to a locally available test.csv.  When provided the dataset "
+            "is NOT downloaded from Kaggle — useful when kagglehub returns only "
+            "a test.csv.zip or when you already have the file on disk."
+        ),
+    )
     args = parser.parse_args()
 
     # ------------------------------------------------------------------
-    # 1. Download dataset (contains both questions.csv and test.csv)
+    # 1. Locate test.csv — local copy takes priority over a fresh download
     # ------------------------------------------------------------------
-    print(f"[INFO] Downloading dataset ({DATASET_HANDLE})...", flush=True)
-    comp_path = kagglehub.dataset_download(DATASET_HANDLE)
-    print(f"[INFO] Dataset path : {comp_path}", flush=True)
-    print(f"[INFO] Files        : {sorted(os.listdir(comp_path))}", flush=True)
+    if args.local_test_csv:
+        local = os.path.abspath(args.local_test_csv)
+        if not os.path.isfile(local):
+            raise FileNotFoundError(
+                f"--local-test-csv path does not exist or is not a file: {local!r}"
+            )
+        if local.endswith(".zip"):
+            raise ValueError(
+                f"--local-test-csv must be a plain CSV, not a zip archive: {local!r}"
+            )
+        test_csv = local
+        print(f"[INFO] Using local test CSV (skipping download): {test_csv}", flush=True)
+    else:
+        print(f"[INFO] Downloading dataset ({DATASET_HANDLE})...", flush=True)
+        comp_path = kagglehub.dataset_download(DATASET_HANDLE)
+        print(f"[INFO] Dataset path : {comp_path}", flush=True)
+        print(f"[INFO] Files        : {sorted(os.listdir(comp_path))}", flush=True)
 
-    test_csv = _find_test_csv(comp_path)
-    print(f"[INFO] Using test CSV   : {test_csv}", flush=True)
+        test_csv = _find_test_csv(comp_path)
+        print(f"[INFO] Using test CSV   : {test_csv}", flush=True)
 
     # ------------------------------------------------------------------
     # 2. Collect unique question texts
