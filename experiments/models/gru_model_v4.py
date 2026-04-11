@@ -193,6 +193,22 @@ def _load_cross_encoder_lookup(zarr_path: str) -> dict[tuple[int, int], float]:
     qid2s  = store["qid2"][:].astype(np.int64)
     scores = store["cross_encoder_score"][:].astype(np.float32)
 
+    # Diagnostic: print a few sample zarr key pairs so we can verify they match the CSV qids.
+    print(
+        f"  [GRU v4] Zarr sample keys (qid1, qid2): "
+        + ", ".join(f"({qid1s[i]}, {qid2s[i]})" for i in range(min(5, len(qid1s)))),
+        flush=True,
+    )
+    # Also report whether the zarr has an 'index' array (CSV row id) which some
+    # generation scripts use instead of qids.
+    if "index" in store:
+        idx_arr = store["index"][:].astype(np.int64)
+        print(
+            f"  [GRU v4] Zarr 'index' array present; sample values: "
+            + ", ".join(str(idx_arr[i]) for i in range(min(5, len(idx_arr)))),
+            flush=True,
+        )
+
     lookup: dict[tuple[int, int], float] = {
         (int(q1), int(q2)): float(s)
         for q1, q2, s in zip(qid1s, qid2s, scores)
@@ -266,6 +282,13 @@ class GRUModelV4:
         """
         ce_zarr_path = self.cfg["cross_encoder_zarr"]
         ce_lookup = _load_cross_encoder_lookup(ce_zarr_path)
+
+        # Diagnostic: print first few (qid1, qid2) from records to compare with zarr keys.
+        print(
+            f"  [GRU v4] Record sample keys (qid1, qid2): "
+            + ", ".join(f"({r.qid1}, {r.qid2})" for r in records[:5]),
+            flush=True,
+        )
 
         fallback   = float(self.cfg["ce_fallback"])
         emb1       = np.array([r.emb1   for r in records], dtype=np.float32)
