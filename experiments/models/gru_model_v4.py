@@ -272,13 +272,19 @@ class GRUModelV4:
         emb2       = np.array([r.emb2   for r in records], dtype=np.float32)
         y          = np.array([r.label  for r in records], dtype=np.int64)
         ce_scores  = np.array(
-            [ce_lookup.get((r.qid1, r.qid2), fallback) for r in records],
+            [
+                ce_lookup.get(
+                    (r.qid1, r.qid2),
+                    ce_lookup.get((r.qid2, r.qid1), fallback),
+                )
+                for r in records
+            ],
             dtype=np.float32,
         )
 
         n_missing = sum(
             1 for r in records
-            if (r.qid1, r.qid2) not in ce_lookup
+            if (r.qid1, r.qid2) not in ce_lookup and (r.qid2, r.qid1) not in ce_lookup
         )
         if n_missing:
             print(

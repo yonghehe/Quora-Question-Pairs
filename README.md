@@ -81,8 +81,12 @@ Look up a question by ID with `np.searchsorted(store["ids"], qid)`.
 ## Running on the NUS SOC Cluster (Slurm)
 *Follow this to do what I did!*
 
+> [!WARNING]
+> **DO NOT run heavy scripts (like embedding or training) directly on the login node.**
+> Running intensive processes on the login node can slow down the system for all users and may result in your process being terminated by administrators. Always use `submit.sh` or `sbatch` to queue your tasks.
+
 > **What is Slurm?**
-> Slurm is a job scheduler used by HPC (high-performance computing) clusters. Because many users share the same machines, you don't run scripts directly — you submit a *job* describing what resources you need (GPUs, RAM, time limit) and Slurm queues it up and runs it when those resources are free. `slurmscript.sh` is that job description: the `#SBATCH` lines at the top are directives to Slurm (not regular shell comments), and the last line is the actual command to execute.
+> Slurm is a job scheduler used by HPC (high-performance computing) clusters. Because many users share the same machines, you don't run scripts directly — you submit a *job* describing what resources you need (GPUs, RAM, time limit) and Slurm queues it up and runs it when those resources are free. Slurm scripts (like `slurm_gpu.sh` or `slurm_cpu.sh`) are those job descriptions: the `#SBATCH` lines at the top are directives to Slurm (not regular shell comments), and the last line is the actual command to execute.
 >
 > Useful Slurm commands:
 > | Command | What it does |
