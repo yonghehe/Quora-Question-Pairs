@@ -566,7 +566,50 @@ def run(args: argparse.Namespace) -> None:
                 flush=True,
             )
     else:
-        print("[run] Hyperparameter tuning skipped (using model defaults).", flush=True)
+        # No explicit --params-file or --tune-* given.
+        # Check whether the model declares a `tuning_file` class attribute
+        # that points to a pre-computed best_params JSON in experiments/tuning/.
+        # If so, load and apply the params automatically — no CLI flag needed.
+        # Pass --no-tune explicitly to skip auto-loading and keep defaults.
+        _tf = getattr(model, "tuning_file", None)
+        if _tf is not None and hasattr(model, "apply_tuned_params"):
+            _tf_abs = os.path.join(script_dir, "tuning", _tf)
+            if os.path.exists(_tf_abs):
+                print(
+                    f"[run] Auto-loading tuned params from model's declared "
+                    f"tuning_file: {_tf_abs}",
+                    flush=True,
+                )
+                with open(_tf_abs, "r", encoding="utf-8") as _fh:
+                    _payload = json.load(_fh)
+                _best_params = _payload.get("best_params")
+                if isinstance(_best_params, dict) and _best_params:
+                    model.apply_tuned_params(
+                        _best_params,
+                        source=_tf_abs,
+                        cv_score=_payload.get("best_score"),
+                        method=_payload.get("method", "tuning_file"),
+                    )
+                    print(
+                        f"[run] Auto-loaded {len(_best_params)} params from "
+                        f"tuning/{_tf} "
+                        f"(score={_payload.get('best_score')}).",
+                        flush=True,
+                    )
+                else:
+                    print(
+                        f"[run] WARNING: {_tf} has no 'best_params' key — "
+                        "using model's built-in defaults.",
+                        flush=True,
+                    )
+            else:
+                print(
+                    f"[run] NOTE: Model declares tuning_file='{_tf}' but "
+                    f"{_tf_abs} was not found — using model's built-in defaults.",
+                    flush=True,
+                )
+        else:
+            print("[run] Hyperparameter tuning skipped (using model defaults).", flush=True)
 
     # ------------------------------------------------------------------
     # 5. Fit

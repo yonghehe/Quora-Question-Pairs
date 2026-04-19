@@ -106,9 +106,22 @@ class XGBoostClassicalModel:
         LDA EM iterations (increase for better convergence at the cost of speed).
     **kwargs
         Additional keyword arguments forwarded to XGBClassifier.
+
+    Auto-loading convention
+    -----------------------
+    Setting ``tuning_file = "xgboost_best_params.json"`` tells
+    run_experiment.py to automatically load the best hyperparameters from
+    experiments/tuning/xgboost_best_params.json at the start of Step 4
+    (Hyperparameter handling) whenever neither ``--params-file`` nor any
+    ``--tune-*`` flag is passed on the CLI.  Pass ``--no-tune`` to suppress
+    auto-loading and keep the built-in defaults.
     """
 
     name = "XGBoost + Classical Features"
+
+    # Path relative to experiments/tuning/ — picked up automatically by
+    # run_experiment.py (Step 4) when no explicit --params-file is given.
+    tuning_file = "xgboost_best_params.json"
 
     def __init__(
         self,

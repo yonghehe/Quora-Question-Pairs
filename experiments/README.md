@@ -167,6 +167,86 @@ def apply_tuned_params(self, best_params, *, source=None, cv_score=None, method=
 …then add the class to `TUNING_REGISTRY` in `tune.py`. The existing
 `XGBoostModel` and `CatBoostModel` are working references.
 
+### Automatic hyperparameter loading (`tuning_file` convention)
+
+Once a tuning run has produced a `best_params.json` in
+`experiments/tuning/`, you can make `run_experiment.py` load it
+**automatically** — without any `--params-file` CLI flag — by declaring a
+single class attribute on the model:
+
+```python
+class MyModel:
+    # Filename relative to experiments/tuning/.
+    # run_experiment.py reads this at Step 4 and calls apply_tuned_params()
+    # whenever --params-file is not given and --no-tune has not been passed.
+    tuning_file = "my_model_best_params.json"   # ← add this line
+```
+
+**How it works — Step 4 precedence (highest → lowest)**
+
+| Condition | Action |
+|-----------|--------|
+| `--params-file PATH` supplied | Load that specific file (exact path) |
+| `--tune-random` or `--tune-optuna` | Run in-process tuning (legacy) |
+| `--no-tune` passed explicitly | Skip all param loading, use model defaults |
+| *(none of the above)* + model has `tuning_file` | **Auto-load** from `experiments/tuning/<tuning_file>` |
+| *(none of the above)* + no `tuning_file` | Use model's built-in `_DEFAULTS` |
+
+The file must follow the schema written by `tune.py`:
+
+```json
+{
+  "best_params": { "max_depth": 12, "learning_rate": 0.03, "..." : "..." },
+  "best_score": 0.833,
+  "method": "OptunaSearchCV",
+  "model": "xgboost_classical"
+}
+```
+
+`run_experiment.py` reads `best_params`, calls `model.apply_tuned_params()`,
+and logs the score and source path.  If the file is missing it falls back
+gracefully to the model defaults with a printed warning.
+
+**Current models with `tuning_file` set**
+
+| Model class | `tuning_file` | Loaded params |
+|-------------|--------------|---------------|
+| `XGBoostClassicalModel` | `xgboost_best_params.json` | max_depth, learning_rate, n_estimators, … |
+
+**Adding `tuning_file` to your model — checklist**
+
+1. Run `tune.py` once to produce `experiments/tuning/<name>/best_params.json`.
+2. Copy or symlink that file into `experiments/tuning/` with a stable filename
+   (e.g. `my_model_best_params.json`).
+3. Add `tuning_file = "my_model_best_params.json"` to the model class.
+4. Implement `apply_tuned_params(best_params, *, source, cv_score, method)`
+   (already required for `--params-file` support).
+5. That's it — the next `run_experiment.py` invocation loads the params
+   automatically at Step 4.
+
+**Special case — deep-learning models (GRU, LSTM)**
+
+Deep-learning models initialise their architecture at construction time (not
+at `fit()` time), so their hyperparameters must be supplied to `__init__`.
+They cannot use `apply_tuned_params()` after construction; instead pass the
+tuned values directly in the `MODEL_REGISTRY` entry:
+
+```python
+"gru_v3_tuned": GRUModelV3(
+    hidden_size  = 512,
+    num_layers   = 1,
+    dropout      = 0.217,
+    lr           = 5.4e-4,
+    weight_decay = 2.3e-4,
+    mlp_hidden   = 256,
+),
+```
+
+Alternatively, the model can read a non-standard tuning report
+(e.g. `gru3params.json` which stores params under `"model_config"`)
+inside `__init__` using a small helper — see `EnsembleClassicalModel`'s
+`_load_gru3_params()` function as a reference.
+
 ### Legacy in-process tuning (`--tune-optuna`)
 
 `run_experiment.py --tune-optuna` still works for backward compatibility, but

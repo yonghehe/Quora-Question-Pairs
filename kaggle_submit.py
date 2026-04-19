@@ -87,17 +87,22 @@ sys.path.insert(0, _EXPERIMENTS)
 
 import kagglehub
 from data import PairRecord, load_pairs
+
 from models import (
     CatBoostModel,
     CosineBaseline,
     EnsembleModel,
+    EnsembleClassicalModel,
     GRUModel,
     GRUModelV2,
     GRUModelV3,
+    GRUModelV4,
+    LSTMModel,
     LogRegModel,
     RandomForestModel,
     RandomForestTopKModel,
     XGBoostModel,
+    XGBoostClassicalModel,
 )
 
 # ---------------------------------------------------------------------------
@@ -134,6 +139,24 @@ MODEL_REGISTRY: dict[str, object] = {
     "ensemble_trees_mean": EnsembleModel(
         members=[XGBoostModel(), CatBoostModel(), RandomForestModel()],
         strategy="mean",
+    ),
+    # ------------------------------------------------------------------ #
+    # Classical ensemble models                                           #
+    #   Members: XGBoostClassicalModel (tuned) + GRUModelV3 (tuned)      #
+    #            + CatBoostModel                                          #
+    #   Best hyperparameters are loaded automatically from               #
+    #   experiments/tuning/ at instantiation time.                       #
+    # ------------------------------------------------------------------ #
+    "ensemble_classical_mean": EnsembleClassicalModel(
+        strategy="mean",
+    ),
+    "ensemble_classical_weighted": EnsembleClassicalModel(
+        strategy="mean",
+        weights=[2.0, 1.0, 2.0],
+    ),
+    "ensemble_classical_stack": EnsembleClassicalModel(
+        strategy="stacking",
+        meta_folds=5,
     ),
 }
 
@@ -424,6 +447,13 @@ def run(args: argparse.Namespace) -> None:
         f"({N_train:,} train + {N_test:,} test)...",
         flush=True,
     )
+    # Featurizers (TF-IDF, char-ngrams, topic model, etc.) are fit on ALL
+    # records — train + test combined.  The Kaggle test labels are dummy 0s
+    # (unknown), so there is no label leakage from including test rows here.
+    # Fitting on the full corpus gives better vocabulary coverage.
+    # We deliberately do NOT pass train_idx so EnsembleClassicalModel passes
+    # None to XGBoostClassicalModel, which then fits its featurizers on every
+    # row rather than just the training subset.
     t_feat = time.time()
     X_all, y_all, feature_names = model.build_features(all_records)
     print(
