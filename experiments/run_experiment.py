@@ -61,8 +61,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 from data import load_pairs
 from report import generate_report
 from models import (
-    CatBoostModel, CosineBaseline, EnsembleModel, LogRegModel,
-    XGBoostModel, XGBoostClassicalModel,
+    CatBoostModel, CosineBaseline, EnsembleModel, EnsembleClassicalModel,
+    LogRegModel, XGBoostModel, XGBoostClassicalModel,
     RandomForestModel, RandomForestTopKModel,
     GRUModel, GRUModelV2, GRUModelV3, GRUModelV4, LSTMModel,
 )
@@ -128,6 +128,30 @@ MODEL_REGISTRY: dict[str, object] = {
     "ensemble_trees_mean": EnsembleModel(
         members=[XGBoostModel(), CatBoostModel(), RandomForestModel()],
         strategy="mean",
+    ),
+    # ------------------------------------------------------------------
+    # Classical ensemble models
+    #   Members: XGBoostClassicalModel (tuned) + GRUModelV3 (tuned) + CatBoostModel
+    #   Best hyperparameters are loaded automatically at instantiation time
+    #   from experiments/tuning/xgboost_best_params.json (XGBoost) and
+    #   experiments/tuning/gru3params.json (GRU v3).
+    #   XGBoostClassicalModel.build_features() receives train_idx so its
+    #   TF-IDF / char-ngram / topic featurizers are fit on training data only.
+    # ------------------------------------------------------------------
+    # Unweighted mean of all three members.
+    "ensemble_classical_mean": EnsembleClassicalModel(
+        strategy="mean",
+    ),
+    # Weighted mean: up-weight the two tree models relative to the GRU.
+    # [XGBoostClassical, GRU v3, CatBoost]
+    "ensemble_classical_weighted": EnsembleClassicalModel(
+        strategy="mean",
+        weights=[2.0, 1.0, 2.0],
+    ),
+    # Full stacking: OOF LogReg meta-learner learns the optimal combination.
+    "ensemble_classical_stack": EnsembleClassicalModel(
+        strategy="stacking",
+        meta_folds=5,
     ),
 }
 

@@ -3,6 +3,7 @@
 from .catboost_model import CatBoostModel
 from .cosine_baseline import CosineBaseline
 from .ensemble_model import EnsembleModel
+from .ensemble_classical_model import EnsembleClassicalModel
 from .logreg_model import LogRegModel
 from .xgboost_model import XGBoostModel
 from .xgboost_classical import XGBoostClassicalModel
@@ -18,6 +19,7 @@ __all__ = [
     "CatBoostModel",
     "CosineBaseline",
     "EnsembleModel",
+    "EnsembleClassicalModel",
     "LogRegModel",
     "XGBoostModel",
     "XGBoostClassicalModel",
