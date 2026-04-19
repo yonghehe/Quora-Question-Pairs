@@ -1,0 +1,16 @@
+{
+  "model": "xgboost_classical",
+  "tuning_name": "tune_xgboost2",
+  "best_score": 0.8328017263570011,
+  "scoring": "f1",
+  "method": "OptunaSearchCV",
+  "best_params": {
+    "max_depth": 12,
+    "min_child_weight": 6,
+    "learning_rate": 0.032739865693868074,
+    "n_estimators": 945,
+    "subsample": 0.7287518483478879,
+    "colsample_bytree": 0.6194454816018433,
+    "reg_alpha": 0.03444571620743402
+  }
+}
