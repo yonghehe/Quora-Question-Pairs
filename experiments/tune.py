@@ -243,7 +243,7 @@ def parse_args() -> argparse.Namespace:
                         help="Path to cross_encoder_scores.zarr.")
     parser.add_argument("--split-file", default=None, metavar="PATH",
                         help="Path to saved split .npz. Defaults to splits/default_split.npz.")
-    parser.add_argument("--results-dir", default=None, metavar="PATH",
+    parser.add_argument("--results-dir", default="experiments/results", metavar="PATH",
                         help="Results root. Output goes under <results-dir>/tuning/<name>/.")
     parser.add_argument(
         "--dvc-push",
